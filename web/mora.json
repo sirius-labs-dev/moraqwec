@@ -1,0 +1,376 @@
+{
+  "address": "9fcXHD3pHDKLX79JuVgCEKQiqYkvVqFtpoAEVjBq4aJ8",
+  "metadata": {
+    "name": "mora",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Mora — minimal escrow + voucher settlement for Solana Mobile"
+  },
+  "instructions": [
+    {
+      "name": "close_escrow",
+      "discriminator": [
+        139,
+        171,
+        94,
+        146,
+        191,
+        91,
+        144,
+        50
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "escrow"
+          ]
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "account",
+                "path": "escrow.seed",
+                "account": "Escrow"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_escrow",
+      "discriminator": [
+        253,
+        215,
+        165,
+        116,
+        36,
+        108,
+        68,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "arg",
+                "path": "seed"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "seed",
+          "type": "u64"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "settle",
+      "discriminator": [
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "submitter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow.authority",
+                "account": "Escrow"
+              },
+              {
+                "kind": "account",
+                "path": "escrow.seed",
+                "account": "Escrow"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payee",
+          "writable": true
+        },
+        {
+          "name": "receipt",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  99,
+                  101,
+                  105,
+                  112,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ix_sysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u64"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Escrow",
+      "discriminator": [
+        31,
+        213,
+        123,
+        187,
+        186,
+        22,
+        218,
+        155
+      ]
+    },
+    {
+      "name": "Receipt",
+      "discriminator": [
+        39,
+        154,
+        73,
+        106,
+        80,
+        102,
+        145,
+        153
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ZeroAmount",
+      "msg": "amount must be > 0"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidExpiry",
+      "msg": "expires_at must be in the future"
+    },
+    {
+      "code": 6002,
+      "name": "Expired",
+      "msg": "escrow expired"
+    },
+    {
+      "code": 6003,
+      "name": "NotExpired",
+      "msg": "escrow not yet expired"
+    },
+    {
+      "code": 6004,
+      "name": "InsufficientFunds",
+      "msg": "insufficient escrow funds"
+    },
+    {
+      "code": 6005,
+      "name": "SelfPayment",
+      "msg": "payee equals authority — self-payment forbidden"
+    },
+    {
+      "code": 6006,
+      "name": "Ed25519IxMissing",
+      "msg": "Ed25519 verify ix not present at expected index"
+    },
+    {
+      "code": 6007,
+      "name": "WrongVerifyProgram",
+      "msg": "preceding instruction is not the Ed25519 native program"
+    },
+    {
+      "code": 6008,
+      "name": "MalformedSig",
+      "msg": "Ed25519 ix data malformed"
+    },
+    {
+      "code": 6009,
+      "name": "SignerMismatch",
+      "msg": "Ed25519 signer does not match escrow.authority"
+    },
+    {
+      "code": 6010,
+      "name": "MsgMismatch",
+      "msg": "Ed25519 message does not match expected voucher bytes"
+    },
+    {
+      "code": 6011,
+      "name": "Underflow",
+      "msg": "integer underflow"
+    },
+    {
+      "code": 6012,
+      "name": "Overflow",
+      "msg": "integer overflow"
+    }
+  ],
+  "types": [
+    {
+      "name": "Escrow",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "seed",
+            "type": "u64"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "spent",
+            "type": "u64"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Receipt",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "mora",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
+    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+    "test": "anchor test",
+    "mora": "tsx cli/mora.ts",
+    "web": "npx serve web -l 5173 -C"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@qvac/sdk": "^0.10.2",
+    "@solana/web3.js": "^1.95.3",
+    "commander": "^14.0.3",
+    "qrcode-terminal": "^0.12.0",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.5",
+    "@types/chai": "^4.3.16",
+    "@types/mocha": "^10.0.7",
+    "@types/node": "^20.14.10",
+    "@types/qrcode-terminal": "^0.12.2",
+    "chai": "^4.5.0",
+    "mocha": "^10.7.0",
+    "prettier": "^3.3.3",
+    "ts-mocha": "^10.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.5.3"
+  }
+}

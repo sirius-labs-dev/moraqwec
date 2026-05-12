@@ -1,0 +1,19 @@
+# Solana program (Anchor) — out of scope for the web deploy
+programs/
+target/
+.anchor/
+Cargo.toml
+Cargo.lock
+Anchor.toml
+
+# Tooling that doesn't ship to the static site
+cli/
+tests/
+migrations/
+node_modules/
+
+# Repo metadata
+.git/
+.gitignore
+.claude/
+*.log

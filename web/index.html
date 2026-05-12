@@ -1,0 +1,1693 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mora — offline payments on Solana</title>
+  <link rel="icon" href="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'&gt;&lt;rect width='32' height='32' rx='6' fill='%2328374C'/&gt;&lt;text x='16' y='22' font-family='monospace' font-size='17' font-weight='700' fill='%23FE6A3C' text-anchor='middle'&gt;M&lt;/text&gt;&lt;/svg&gt;" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="nav-logo" href="#">Mora</a>
+    <div class="nav-actions">
+      <span class="nav-net">Devnet</span>
+      <span class="nav-meta">contract&nbsp;<a id="meta-program-link" href="#" target="_blank" rel="noopener"><b id="meta-program">…</b></a></span>
+      <span id="wallet-area">
+        <button class="connect-btn" id="connect-btn"><span class="ph-mark"></span> Connect Phantom</button>
+      </span>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <h1 class="hero-title">Offline payments on <span>Solana</span>.</h1>
+  <p class="hero-sub">
+    Lock SOL into an on-chain escrow, sign voucher messages while offline, settle them later — replay-protected, expiry-bounded, fully self-custody. Every transaction below is a real call on devnet.
+  </p>
+  <div class="hero-meta">
+    <span><b>3 instructions:</b> create_escrow · settle · close_escrow</span>
+    <span><b>84-byte voucher:</b> "MORA" | escrow | nonce | payee | amount</span>
+    <span>need devnet SOL? <a id="faucet-link" href="https://faucet.solana.com/" target="_blank" rel="noopener">faucet.solana.com</a></span>
+  </div>
+</header>
+
+<!-- ============ SCENARIO BAR ============ -->
+<div class="scenario-bar">
+  <div class="scenario-row">
+    <button class="scenario-btn" id="run-scenario" disabled>
+      <span>▶</span> Run scenario
+    </button>
+    <div class="scenario-steps" id="steps">
+      <span class="scenario-step" data-step="1">1 · Open escrow</span>
+      <span class="scenario-arrow">→</span>
+      <span class="scenario-step" data-step="2">2 · Go offline</span>
+      <span class="scenario-arrow">→</span>
+      <span class="scenario-step" data-step="3">3 · Sign voucher</span>
+      <span class="scenario-arrow">→</span>
+      <span class="scenario-step" data-step="4">4 · Settle</span>
+      <span class="scenario-arrow">→</span>
+      <span class="scenario-step" data-step="5">5 · Close</span>
+    </div>
+    <span class="scenario-status" id="scenario-status">connect Phantom to begin</span>
+  </div>
+</div>
+
+<!-- ============ DEMO SPLIT ============ -->
+<section class="demo-split">
+
+  <div class="demo-stage">
+
+    <!-- ─────────── ALICE PHONE ─────────── -->
+    <div class="phone-wrap">
+      <div class="phone-label">
+        <span class="phone-dot" style="background:#fe6a3c"></span>
+        <span>Alice · Pay (you, signing offline)</span>
+      </div>
+      <div class="phone-bezel">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+
+          <div id="alice-toast"></div>
+          <div id="alice-sheet"></div>
+
+          <div class="mob-screen">
+            <div class="mob-top">
+              <h1 class="mob-h1">Mora <span style="color:var(--pay-accent)">Pay</span></h1>
+              <div class="mob-walletrow">
+                <span class="mob-pubkey" id="alice-pk">— not connected —</span>
+                <span class="mob-status idle" id="alice-status"><span class="dot"></span><span id="alice-status-text">Idle</span></span>
+              </div>
+            </div>
+
+            <div class="mob-body" id="alice-view-home">
+              <!-- LOCKED PLACEHOLDER (when no wallet) -->
+              <div id="alice-locked" class="mob-locked">
+                <div class="mob-locked-icon">🔌</div>
+                <div class="mob-locked-title">Connect your wallet</div>
+                <div class="mob-locked-sub">Phantom on devnet. Tap the button up top.</div>
+              </div>
+
+              <!-- WHEN CONNECTED -->
+              <div id="alice-connected" style="display:none">
+                <!-- WALLET STRIP — TOP -->
+                <div class="mob-card">
+                  <div class="kv"><span class="kv-key">Alice</span>
+                    <span><span class="kv-val" id="alice-bal">— SOL</span>
+                    <button class="btn" style="margin-left:6px;padding:2px 7px" id="alice-btn-refresh">↻</button></span></div>
+                  <div class="kv" style="margin-top:4px"><span class="kv-key">Addr</span>
+                    <a class="kv-val" id="alice-pk-link" href="#" target="_blank" rel="noopener">…</a></div>
+                  <hr class="rule mt-2 mb-2" />
+                  <div class="flex gap-2">
+                    <button class="mob-cta ghost compact" id="alice-btn-copy" style="flex:1">Copy address</button>
+                    <button class="mob-cta pos compact" id="alice-btn-fund" style="flex:1">Fund 0.1 ◎ via Phantom</button>
+                  </div>
+                  <div class="mob-meta" style="margin-top:6px;font-size:10px;line-height:1.4">In-browser keypair · signs txs + vouchers locally</div>
+                </div>
+
+                <!-- ACTIVE SESSION CARD -->
+                <div id="alice-active-card" class="mt-2"></div>
+
+                <!-- VOUCHER CHAIN (off-chain audit, BT receivers verify before settle) -->
+                <div class="mob-sec">Voucher chain</div>
+                <div class="mob-chain" id="alice-chain">
+                  <div class="mob-chain-empty">chain empty · open a session</div>
+                </div>
+
+                <!-- ACTIONS — primary swaps based on state -->
+                <div class="space-y-2 mt-2" id="alice-actions">
+                  <button class="mob-cta" id="alice-btn-sign" style="display:none">Sign voucher (manual)</button>
+                  <button class="mob-cta" id="alice-btn-new"><span>＋</span> New session</button>
+                </div>
+
+                <!-- BT INDICATOR -->
+                <div class="mob-meta" style="margin-top:10px;font-size:10.5px;text-align:center">
+                  <span class="mob-bt">📡 BT bus listening</span>
+                  <span style="margin-left:6px">incoming Bob requests auto-prompt</span>
+                </div>
+
+                <!-- ACTIVITY LOG — BOTTOM -->
+                <div class="mob-sec">Activity</div>
+                <div class="mob-activity" id="alice-activity">
+                  <div class="mob-activity-empty">no activity yet</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mob-body" id="alice-view-history" style="display:none">
+              <div class="mob-sec">All on-chain escrows</div>
+              <div class="mob-card" id="alice-history-list">
+                <div class="mob-row"><div class="mob-row-main"><div class="mob-row-sub">connect wallet first</div></div></div>
+              </div>
+              <button class="mob-cta ghost compact mt-2" id="alice-btn-list-refresh" disabled>Reload from chain</button>
+            </div>
+
+            <div class="mob-tabs">
+              <button class="mob-tab active pay" data-role="alice" data-tab="home">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10" /></svg>
+                <span class="mob-tab-label">Home</span>
+              </button>
+              <button class="mob-tab" data-role="alice" data-tab="history">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+                <span class="mob-tab-label">History</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─────────── BOB PHONE ─────────── -->
+    <div class="phone-wrap">
+      <div class="phone-label">
+        <span class="phone-dot" style="background:#2c7a55"></span>
+        <span>Bob · POS (settles vouchers, fixed receiver)</span>
+      </div>
+      <div class="phone-bezel">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+
+          <div id="bob-toast"></div>
+          <div id="bob-sheet"></div>
+
+          <div class="mob-screen">
+            <div class="mob-top">
+              <h1 class="mob-h1">Mora <span style="color:var(--pos-accent)">POS</span></h1>
+              <div class="mob-walletrow">
+                <span class="mob-pubkey" id="bob-pk">— receiver pending —</span>
+                <span class="mob-status idle" id="bob-status"><span class="dot"></span><span id="bob-status-text">Idle</span></span>
+              </div>
+            </div>
+
+            <div class="mob-body" id="bob-view-home">
+              <!-- LOCKED PLACEHOLDER -->
+              <div id="bob-locked" class="mob-locked">
+                <div class="mob-locked-icon">🔌</div>
+                <div class="mob-locked-title">Connect your wallet</div>
+                <div class="mob-locked-sub">Same wallet acts as the relayer — pays receipt rent + tx fee.</div>
+              </div>
+
+              <!-- WHEN CONNECTED · home view -->
+              <div id="bob-connected" style="display:none">
+                <!-- TEST BOB BALANCE — TOP -->
+                <div class="mob-card">
+                  <div class="kv"><span class="kv-key">Test Bob</span>
+                    <span><span class="kv-val" id="bob-bal-top">— SOL</span></span></div>
+                </div>
+
+                <!-- TODAY CARD -->
+                <div class="mob-card dark mt-2">
+                  <div class="mob-card-title">Received this session</div>
+                  <div><span class="mob-bigamt" id="bob-today">0.0000</span><span class="mob-bigamt-suf">SOL</span></div>
+                  <div class="mob-bar-foot mt-2"><span id="bob-today-count">0 sales</span><span>devnet</span></div>
+                </div>
+
+                <!-- CLAIM BANNER — visible whenever pending vouchers exist -->
+                <div id="bob-claim-banner" class="mob-card mt-2" style="display:none;background:#fff5f0;border-color:#fdcab2"></div>
+
+                <!-- inline fund prompt only when balance is too low -->
+                <div id="bob-fund-prompt" style="display:none" class="mob-card mt-2">
+                  <div class="mob-card-title">Top up Test Bob</div>
+                  <div class="mob-meta" style="line-height:1.5;margin-bottom:10px">~0.003 ◎ needed for receipt rent + tx fee.</div>
+                  <button class="mob-cta pos compact" id="bob-btn-fund-inline">Fund 0.005 ◎ from Alice</button>
+                </div>
+
+                <div class="mob-sec">Pending</div>
+                <div class="mob-card" id="bob-pending">
+                  <div class="mob-row"><div class="mob-row-main"><div class="mob-row-sub">no pending vouchers</div></div></div>
+                </div>
+
+                <div class="mob-sec">Recent settlements</div>
+                <div class="mob-card" id="bob-sales">
+                  <div class="mob-row"><div class="mob-row-main"><div class="mob-row-sub">no sales yet</div></div></div>
+                </div>
+
+                <!-- PRIMARY ACTION — charge customer over BT -->
+                <button class="mob-cta pos mt-2" id="bob-btn-charge"><span>＋</span> Charge customer</button>
+                <button class="mob-cta ghost compact mt-2" id="bob-btn-receive" style="font-size:11px">Paste voucher manually (advanced)</button>
+
+                <!-- ACTIVITY LOG — BOTTOM -->
+                <div class="mob-sec">Activity</div>
+                <div class="mob-activity" id="bob-activity">
+                  <div class="mob-activity-empty">no activity yet</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- WALLET TAB -->
+            <div class="mob-body" id="bob-view-wallet" style="display:none">
+              <div class="mob-sec">Test Bob</div>
+              <div class="mob-card">
+                <div class="mob-meta" style="line-height:1.5;margin-bottom:10px">In-browser keypair · signs settle locally · real devnet account</div>
+                <div class="kv"><span class="kv-key">Address</span>
+                  <a class="kv-val" id="bob-pk-link" href="#" target="_blank" rel="noopener">…</a></div>
+                <div class="kv" style="margin-top:6px"><span class="kv-key">Balance</span>
+                  <span class="kv-val" id="bob-bal">— SOL</span></div>
+              </div>
+              <div class="space-y-2 mt-2">
+                <button class="mob-cta pos compact" id="bob-btn-fund">Fund 0.005 ◎ from Alice</button>
+                <button class="mob-cta ghost compact" id="bob-btn-refresh">Refresh balance</button>
+                <div class="flex gap-2">
+                  <button class="mob-cta ghost compact" id="bob-btn-copy" style="flex:1">Copy address</button>
+                  <button class="mob-cta ghost compact" id="bob-btn-export" style="flex:1">Export key</button>
+                </div>
+                <button class="mob-cta danger compact" id="bob-btn-regen">Regenerate Bob</button>
+              </div>
+            </div>
+
+            <div class="mob-tabs">
+              <button class="mob-tab active pos" data-role="bob" data-tab="home">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M9 7h6M9 11h6M9 15h4" /></svg>
+                <span class="mob-tab-label">Receive</span>
+              </button>
+              <button class="mob-tab" data-role="bob" data-tab="wallet">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M16 13h2" /></svg>
+                <span class="mob-tab-label">Wallet</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="demo-narration">
+    <div class="section-label">For the judge</div>
+    <ol>
+      <li><strong>Connect Phantom</strong> (top-right). Devnet only — make sure Phantom shows the network as <code>Devnet</code> when it asks to approve transactions. Need SOL? Use <a href="https://faucet.solana.com/" target="_blank">faucet.solana.com</a>.</li>
+      <li><strong>Open escrow:</strong> Alice locks SOL on-chain into a PDA derived from <code>(your_pubkey, seed)</code>. Real <code>create_escrow</code> tx, real lamports moved.</li>
+      <li><strong>Go offline + sign voucher:</strong> Alice's phone produces an 84-byte canonical message (<code>"MORA" | escrow | nonce | payee | amount</code>) and Phantom's <code>signMessage</code> Ed25519-signs it. No RPC call — purely offline.</li>
+      <li><strong>Settle:</strong> Same wallet plays the relayer. Submits a 2-instruction tx: Solana's Ed25519 native verify + our <code>settle</code> ix. Contract validates the previous ix was Ed25519 over the canonical bytes, transfers lamports to the receiver, creates a Receipt PDA. Replay of the same nonce fails on init.</li>
+      <li><strong>Close:</strong> After expiry, <code>close_escrow</code> reclaims rent + remainder. Whole protocol is three on-chain instructions.</li>
+    </ol>
+  </div>
+</section>
+
+<script type="module">
+import {
+  Connection, Keypair, PublicKey, Transaction,
+  SystemProgram, LAMPORTS_PER_SOL,
+  SYSVAR_INSTRUCTIONS_PUBKEY, Ed25519Program,
+} from "https://esm.sh/@solana/web3.js@1.95.3";
+import { Program, AnchorProvider, BN } from "https://esm.sh/@coral-xyz/anchor@0.32.1";
+import nacl from "https://esm.sh/tweetnacl@1.0.3";
+import QRCode from "https://esm.sh/qrcode@1.5.3";
+
+// ── chain config ────────────────────────────────────────────────────────
+const RPC_URL = "https://api.devnet.solana.com";
+const PROGRAM_ID = new PublicKey("9fcXHD3pHDKLX79JuVgCEKQiqYkvVqFtpoAEVjBq4aJ8");
+const connection = new Connection(RPC_URL, "confirmed");
+
+const programShort = PROGRAM_ID.toBase58().slice(0, 4) + "…" + PROGRAM_ID.toBase58().slice(-4);
+$id("meta-program").textContent = programShort;
+$id("meta-program-link").href = `https://explorer.solana.com/address/${PROGRAM_ID.toBase58()}?cluster=devnet`;
+
+const idl = await (await fetch("./mora.json")).json();
+
+// ── Test Alice + Test Bob keypairs (in-browser) ────────────────────────
+// Both Alice and Bob use persistent in-browser keypairs stored in
+// localStorage. They are the operational keys — they sign txs and (for
+// Alice) sign voucher messages via nacl directly. Phantom is optional and
+// only used as a funder (can transfer SOL into either key). We don't go
+// through Phantom.signMessage because recent Phantom builds reject 84-byte
+// binary payloads as "looks like a transaction".
+const ALICE_KEY = "mora.alice.devkey";
+const BOB_KEY   = "mora.bob.devkey";
+
+function loadKp(storeKey) {
+  const stored = localStorage.getItem(storeKey);
+  if (stored) return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(stored)));
+  const fresh = Keypair.generate();
+  localStorage.setItem(storeKey, JSON.stringify(Array.from(fresh.secretKey)));
+  return fresh;
+}
+function regenKp(storeKey) { localStorage.removeItem(storeKey); return loadKp(storeKey); }
+
+let aliceKp = loadKp(ALICE_KEY);
+let bobKp   = loadKp(BOB_KEY);
+function regenBobKp() { return regenKp(BOB_KEY); }
+function regenAliceKp() { return regenKp(ALICE_KEY); }
+
+// ── pending vouchers (signed but not yet settled) ──────────────────────
+const PENDING_KEY = "mora.pending";
+
+function loadPending() {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch { return []; }
+}
+function savePending(arr) {
+  localStorage.setItem(PENDING_KEY, JSON.stringify(arr.slice(0, 20)));
+}
+function addPending(entry) {
+  // Dedup by voucher base64 — prefer the newest record (which carries
+  // chain_meta from the BT round-trip) over the bare voucher saved at
+  // sign time.
+  const arr = loadPending().filter((p) => p.b64 !== entry.b64);
+  arr.unshift(entry);
+  savePending(arr);
+}
+function removePending(b64) {
+  const arr = loadPending().filter((p) => p.b64 !== b64);
+  savePending(arr);
+}
+
+// ── tiny dom helpers ────────────────────────────────────────────────────
+function $id(id) { return document.getElementById(id); }
+function el(tag, attrs = {}, kids = []) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v;
+    else if (k === "html") e.innerHTML = v;
+    else if (k === "on") for (const [evt, fn] of Object.entries(v)) e.addEventListener(evt, fn);
+    else e.setAttribute(k, v);
+  }
+  for (const kid of [].concat(kids)) {
+    if (kid == null) continue;
+    e.appendChild(typeof kid === "string" ? document.createTextNode(kid) : kid);
+  }
+  return e;
+}
+const fmtPk = (pk) => pk.toBase58().slice(0, 4) + "…" + pk.toBase58().slice(-4);
+const fmtSol = (l) => (Number(l) / LAMPORTS_PER_SOL).toFixed(4);
+const TX_LINK = (sig) => `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
+const ACC_LINK = (pk) => `https://explorer.solana.com/address/${pk}?cluster=devnet`;
+const lamports = (sol) => new BN(Math.round(parseFloat(sol) * LAMPORTS_PER_SOL));
+function toLeBuffer(bn, bytes) { return new Uint8Array(bn.toArrayLike(Uint8Array, "le", bytes)); }
+function findEscrowPda(authority, seed) {
+  return PublicKey.findProgramAddressSync(
+    [new TextEncoder().encode("escrow"), authority.toBytes(), toLeBuffer(seed, 8)],
+    PROGRAM_ID,
+  );
+}
+function findReceiptPda(escrow, nonce) {
+  return PublicKey.findProgramAddressSync(
+    [new TextEncoder().encode("receipt"), escrow.toBytes(), toLeBuffer(nonce, 8)],
+    PROGRAM_ID,
+  );
+}
+function buildVoucherMessage(escrow, nonce, payee, amount) {
+  const out = new Uint8Array(84);
+  out.set(new TextEncoder().encode("MORA"), 0);
+  out.set(escrow.toBytes(), 4);
+  out.set(toLeBuffer(nonce, 8), 36);
+  out.set(payee.toBytes(), 44);
+  out.set(toLeBuffer(amount, 8), 76);
+  return out;
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ── hex / sha256 helpers (for off-chain voucher chain) ─────────────────
+const ZERO_HASH = "0".repeat(64);
+function bytesToHex(u8) {
+  return Array.from(u8).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function hexToBytes(hex) {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return out;
+}
+async function sha256Hex(...buffers) {
+  let total = 0; for (const b of buffers) total += b.length;
+  const merged = new Uint8Array(total);
+  let o = 0; for (const b of buffers) { merged.set(b, o); o += b.length; }
+  const h = await crypto.subtle.digest("SHA-256", merged);
+  return bytesToHex(new Uint8Array(h));
+}
+
+// ── BroadcastChannel "BT" simulation ──────────────────────────────────
+// Two instances on the same channel name; one acts as Alice's inbox, the
+// other as Bob's. In production this layer is real BLE/NFC; here we keep
+// the protocol identical so it transports without rewriting.
+const BC_NAME = "mora-bt";
+const aliceBus = new BroadcastChannel(BC_NAME);
+const bobBus   = new BroadcastChannel(BC_NAME);
+aliceBus.onmessage = (e) => { if (e.data?.to === "alice") onAliceMsg(e.data); };
+bobBus.onmessage   = (e) => { if (e.data?.to === "bob")   onBobMsg(e.data); };
+
+function btSendToAlice(payload) { bobBus.postMessage({ ...payload, to: "alice", at: Date.now() }); }
+function btSendToBob(payload)   { aliceBus.postMessage({ ...payload, to: "bob",   at: Date.now() }); }
+
+// ── Off-chain hash chain (Alice's local block log per session) ────────
+// Each block: { index, prev, hash, voucher_b64, amount, payee, ts }.
+// Persisted per escrow PDA so the chain survives a page reload.
+function chainKey(escrowB58) { return `mora.alice.chain.${escrowB58}`; }
+function loadChain(escrowB58) {
+  const raw = localStorage.getItem(chainKey(escrowB58));
+  if (raw) try { return JSON.parse(raw); } catch {}
+  return { head: ZERO_HASH, blocks: [] };
+}
+function saveChain(escrowB58, chain) {
+  localStorage.setItem(chainKey(escrowB58), JSON.stringify(chain));
+}
+async function chainAppend(escrowB58, voucherMsgBytes, voucherB64, amountBN, payeePk) {
+  const chain = loadChain(escrowB58);
+  const prev = chain.head;
+  const hash = await sha256Hex(hexToBytes(prev), voucherMsgBytes);
+  const block = {
+    index: chain.blocks.length,
+    prev, hash, voucher_b64: voucherB64,
+    amount: amountBN.toString(16),
+    payee: payeePk.toBase58(),
+    ts: Date.now(),
+  };
+  chain.blocks.push(block);
+  chain.head = hash;
+  saveChain(escrowB58, chain);
+  return block;
+}
+
+// ── Bob's session cache (per Alice escrow) — last block hash + index ──
+const BOB_SESS_KEY = "mora.bob.sessions";
+function bobLoadSess() { try { return JSON.parse(localStorage.getItem(BOB_SESS_KEY) || "{}"); } catch { return {}; } }
+function bobSaveSess(s) { localStorage.setItem(BOB_SESS_KEY, JSON.stringify(s)); }
+function bobGetCached(escrowB58) { return bobLoadSess()[escrowB58] || null; }
+function bobUpdateCached(escrowB58, last_block_hash, last_block_index) {
+  const s = bobLoadSess();
+  s[escrowB58] = { last_block_hash, last_block_index };
+  bobSaveSess(s);
+}
+
+// In-flight charge requests Bob is waiting on (request_id → resolver).
+const bobAwaiting = new Map();
+
+// ── status pill ─────────────────────────────────────────────────────────
+function setStatus(role, kind, text) {
+  $id(`${role}-status`).className = `mob-status ${kind}`;
+  $id(`${role}-status-text`).textContent = text;
+}
+
+// ── activity log ────────────────────────────────────────────────────────
+const activity = { alice: [], bob: [] };
+function pushActivity(role, kind, msg, link) {
+  const ts = new Date().toTimeString().slice(0, 5);
+  activity[role].unshift({ ts, kind, msg, link });
+  activity[role] = activity[role].slice(0, 12);
+  renderActivity(role);
+}
+function renderActivity(role) {
+  const host = $id(`${role}-activity`);
+  host.innerHTML = "";
+  if (!activity[role].length) {
+    host.appendChild(el("div", { class: "mob-activity-empty" }, "no activity yet"));
+    return;
+  }
+  for (const a of activity[role]) {
+    const msg = el("div", { class: `mob-activity-msg ${a.kind || ""}` });
+    msg.textContent = a.msg;
+    if (a.link) {
+      msg.appendChild(document.createTextNode(" "));
+      msg.appendChild(el("a", { href: a.link, target: "_blank", rel: "noopener" }, "↗"));
+    }
+    host.appendChild(el("div", { class: "mob-activity-row" }, [
+      el("div", { class: "mob-activity-time" }, a.ts),
+      msg,
+    ]));
+  }
+}
+
+// ── toast ───────────────────────────────────────────────────────────────
+function toast(role, kind, text) {
+  const host = $id(`${role}-toast`);
+  host.innerHTML = "";
+  const t = el("div", { class: `toast ${kind}` }, text);
+  host.appendChild(t);
+  setTimeout(() => { if (host.firstChild === t) host.innerHTML = ""; }, 2400);
+}
+
+// ── sheet ───────────────────────────────────────────────────────────────
+function openSheet(role, title, sub, body) {
+  const host = $id(`${role}-sheet`);
+  host.innerHTML = "";
+  const close = () => (host.innerHTML = "");
+  const sheet = el(
+    "div", { class: "sheet-bg", on: { click: (e) => { if (e.target === sheet) close(); } } },
+    [el(
+      "div", { class: "sheet" },
+      [
+        el("div", { class: "sheet-grip" }),
+        title ? el("h3", { class: "sheet-title" }, title) : null,
+        sub ? el("p", { class: "sheet-sub" }, sub) : null,
+        ...(Array.isArray(body) ? body : [body]),
+      ],
+    )],
+  );
+  host.appendChild(sheet);
+  return close;
+}
+
+// ── tab switching ───────────────────────────────────────────────────────
+function showView(role, tab) {
+  const phone = $id(`${role}-toast`).closest(".phone-screen");
+  phone.querySelectorAll(`[id^="${role}-view-"]`).forEach((v) => (v.style.display = "none"));
+  const target = $id(`${role}-view-${tab}`);
+  if (target) target.style.display = "block";
+  phone.querySelectorAll(`.mob-tab[data-role="${role}"]`).forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === tab);
+  });
+}
+document.querySelectorAll(".mob-tab[data-role]").forEach((b) => {
+  b.addEventListener("click", () => showView(b.dataset.role, b.dataset.tab));
+});
+
+// ── wallet (Phantom only) ───────────────────────────────────────────────
+const wallet = { provider: null, publicKey: null, signMessageOk: null };
+
+function detectPhantom() {
+  return window.phantom?.solana || (window.solana?.isPhantom ? window.solana : null);
+}
+
+async function connectWallet() {
+  const provider = detectPhantom();
+  if (!provider) {
+    pushActivity("alice", "err", "Phantom not detected — install from phantom.app");
+    toast("alice", "err", "Install Phantom first");
+    return;
+  }
+  try {
+    const resp = await provider.connect();
+    wallet.provider = provider;
+    wallet.publicKey = resp.publicKey;
+    pushActivity("alice", "ok", `Wallet connected · ${fmtPk(resp.publicKey)}`);
+    pushActivity("bob",   "ok", `Wallet connected · ${fmtPk(resp.publicKey)}`);
+    provider.on?.("disconnect", disconnectWallet);
+    provider.on?.("accountChanged", async (pk) => {
+      if (!pk) { await disconnectWallet(); return; }
+      wallet.publicKey = pk;
+      // wipe wallet-scoped session state so it doesn't leak between accounts
+      state.alice.active = null;
+      state.alice.history = [];
+      state.bob.sales = [];
+      state.bob.today = new BN(0);
+      pushActivity("alice", "", `Switched to ${fmtPk(pk)}`);
+      pushActivity("bob",   "", `Switched to ${fmtPk(pk)} — checking pending vouchers`);
+      await afterConnect();
+    });
+    await afterConnect();
+  } catch (e) {
+    pushActivity("alice", "err", `Connect failed: ${e.message ?? e}`);
+    toast("alice", "err", "Connect rejected");
+  }
+}
+
+async function disconnectWallet() {
+  try { await wallet.provider?.disconnect?.(); } catch {}
+  wallet.provider = null;
+  wallet.publicKey = null;
+  state.alice.active = null;
+  state.alice.history = [];
+  state.bob.sales = [];
+  state.bob.today = new BN(0);
+  pushActivity("alice", "", "Disconnected");
+  pushActivity("bob",   "", "Disconnected");
+  await renderConnection();
+}
+
+async function checkSignMessageRaw() {
+  // Phantom should sign raw bytes; verify locally.
+  try {
+    const probe = new TextEncoder().encode("MORA-SIGN-PROBE");
+    const { signature, publicKey } = await wallet.provider.signMessage(probe);
+    const ok = nacl.sign.detached.verify(probe, signature, publicKey.toBytes());
+    wallet.signMessageOk = ok;
+    if (ok) pushActivity("alice", "ok", "Phantom signMessage compatible (raw bytes)");
+    else    pushActivity("alice", "err", "Phantom signMessage wraps payload — vouchers will fail. Try a different wallet.");
+    return ok;
+  } catch (e) {
+    pushActivity("alice", "err", `signMessage probe failed: ${e.message ?? e}`);
+    wallet.signMessageOk = false;
+    return false;
+  }
+}
+
+async function afterConnect() {
+  await renderConnection();
+  await loadHistoryQuiet();
+  // probe signMessage compatibility once
+  if (wallet.signMessageOk === null) await checkSignMessageRaw();
+}
+
+async function renderConnection() {
+  const area = $id("wallet-area");
+  area.innerHTML = "";
+  if (wallet.publicKey) {
+    const bal = await connection.getBalance(wallet.publicKey).catch(() => null);
+    area.appendChild(el("span", { class: "wallet-pill" }, [
+      fmtPk(wallet.publicKey),
+      el("span", { class: "balance" }, bal == null ? "—" : `${fmtSol(bal)} ◎`),
+    ]));
+    area.appendChild(el("button", { class: "connect-btn", style: "margin-left:8px",
+      on: { click: disconnectWallet } }, "Disconnect"));
+  } else {
+    area.appendChild(el("button", { class: "connect-btn", id: "connect-btn",
+      on: { click: connectWallet } },
+      [el("span", { class: "ph-mark" }), document.createTextNode(" Connect Phantom (optional)")]));
+  }
+
+  // Alice + Bob phones are always active — they use in-browser keys.
+  $id("alice-pk").textContent = fmtPk(aliceKp.publicKey);
+  $id("alice-pk-link").textContent = fmtPk(aliceKp.publicKey);
+  $id("alice-pk-link").title = aliceKp.publicKey.toBase58();
+  $id("alice-pk-link").href = ACC_LINK(aliceKp.publicKey.toBase58());
+  $id("alice-locked").style.display = "none";
+  $id("alice-connected").style.display = "block";
+  setStatus("alice", "online", "Online");
+  await refreshAliceBalance();
+
+  $id("bob-locked").style.display = "none";
+  $id("bob-connected").style.display = "block";
+  setStatus("bob", "online", "Ready");
+  await renderBobIdentity();
+
+  $id("run-scenario").disabled = false;
+  $id("alice-btn-list-refresh").disabled = false;
+  $id("scenario-status").innerHTML = wallet.publicKey
+    ? "<b>ready ·</b> Phantom connected (funder); press <b>Run scenario</b>"
+    : "<b>ready ·</b> press <b>Run scenario</b> · fund Alice via faucet or Phantom if low";
+
+  await loadHistoryQuiet();
+  renderActiveCard(); renderSessions(); renderChain();
+  renderBobToday(); renderBobSales(); renderBobPending();
+}
+
+// ── refresh balance (Alice card) ────────────────────────────────────────
+async function refreshAliceBalance() {
+  const bal = await connection.getBalance(aliceKp.publicKey).catch(() => null);
+  $id("alice-bal").textContent = bal == null ? "—" : `${fmtSol(bal)} ◎`;
+}
+
+// ── Test Bob identity + balance ─────────────────────────────────────────
+async function renderBobIdentity() {
+  $id("bob-pk").textContent = fmtPk(bobKp.publicKey);
+  $id("bob-pk-link").textContent = fmtPk(bobKp.publicKey);
+  $id("bob-pk-link").title = bobKp.publicKey.toBase58();
+  $id("bob-pk-link").href = ACC_LINK(bobKp.publicKey.toBase58());
+  await refreshBobBalance();
+}
+async function refreshBobBalance() {
+  const bal = await connection.getBalance(bobKp.publicKey).catch(() => null);
+  const text = bal == null ? "—" : `${fmtSol(bal)} ◎`;
+  $id("bob-bal").textContent = text;
+  const top = $id("bob-bal-top");
+  if (top) top.textContent = text;
+  // show inline fund prompt on home view only when Bob is short on lamports
+  const prompt = $id("bob-fund-prompt");
+  if (prompt) {
+    prompt.style.display = (bal != null && bal < 0.003 * LAMPORTS_PER_SOL) ? "block" : "none";
+  }
+}
+
+// Move 0.005 ◎ from Alice's in-browser key to Bob's so Bob can pay
+// receipt rent + tx fee on settle.
+async function fundBob() {
+  setStatus("bob", "working", "Funding");
+  pushActivity("bob", "", "Transferring 0.005 ◎ from Alice → Bob…");
+  try {
+    const aliceBal = await connection.getBalance(aliceKp.publicKey);
+    if (aliceBal < 0.006 * LAMPORTS_PER_SOL) {
+      pushActivity("bob", "err", `Alice has ${fmtSol(aliceBal)} — fund Alice first via Phantom or faucet`);
+      setStatus("bob", "online", "Ready");
+      return;
+    }
+    const ix = SystemProgram.transfer({
+      fromPubkey: aliceKp.publicKey,
+      toPubkey: bobKp.publicKey,
+      lamports: Math.round(0.005 * LAMPORTS_PER_SOL),
+    });
+    const tx = new Transaction().add(ix);
+    const sig = await sendViaAlice(tx);
+    pushActivity("bob", "tx", `Funded · +0.005 ◎ from Alice`, TX_LINK(sig));
+    await refreshBobBalance(); await refreshAliceBalance();
+    setStatus("bob", "online", "Ready");
+  } catch (e) {
+    pushActivity("bob", "err", (e.message ?? String(e)).slice(0, 100));
+    setStatus("bob", "online", "Ready");
+  }
+}
+
+// Move SOL from connected Phantom wallet into Alice's in-browser key.
+// Used at first-run to seed Alice without leaving the page.
+async function fundAliceFromPhantom(solAmount = 0.1) {
+  if (!wallet.publicKey || !wallet.provider) {
+    toast("alice", "err", "connect Phantom to fund");
+    return;
+  }
+  setStatus("alice", "working", "Funding");
+  pushActivity("alice", "", `Transferring ${solAmount} ◎ Phantom → Alice key…`);
+  try {
+    const ix = SystemProgram.transfer({
+      fromPubkey: wallet.publicKey,
+      toPubkey: aliceKp.publicKey,
+      lamports: Math.round(solAmount * LAMPORTS_PER_SOL),
+    });
+    const tx = new Transaction().add(ix);
+    const sig = await sendViaPhantom(tx);
+    pushActivity("alice", "tx", `Funded · +${solAmount} ◎ from Phantom`, TX_LINK(sig));
+    await refreshAliceBalance();
+    setStatus("alice", "online", "Online");
+  } catch (e) {
+    pushActivity("alice", "err", (e.message ?? String(e)).slice(0, 100));
+    setStatus("alice", "online", "Online");
+  }
+}
+
+// ── state ───────────────────────────────────────────────────────────────
+const state = {
+  alice: { active: null, history: [], online: true },
+  bob:   { sales: [], today: new BN(0) },
+};
+
+// ── render: alice ───────────────────────────────────────────────────────
+function renderActiveCard() {
+  const c = $id("alice-active-card");
+  const btnNew = $id("alice-btn-new");
+  const btnSign = $id("alice-btn-sign");
+  c.innerHTML = "";
+  const a = state.alice.active;
+
+  if (!a) {
+    // No session: minimalist hint, primary CTA is "New session".
+    c.appendChild(el("div", { class: "mob-meta", style: "padding:6px 2px;font-size:11.5px" },
+      "No active session. Lock funds to start signing vouchers."));
+    btnSign.style.display = "none";
+    btnNew.className = "mob-cta";
+    btnNew.firstChild ? null : null; // keep label
+    return;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const left = a.expires - now;
+  const expired = left <= 0;
+  const remaining = a.amount.sub(a.spent);
+  const pct = Math.max(0, Math.min(100, (Number(remaining) / Number(a.amount)) * 100));
+
+  const card = el("div", { class: "mob-card dark" }, [
+    el("div", { class: "mob-card-title" }, expired ? "Expired session" : "Active session"),
+    el("div", {}, [
+      el("span", { class: "mob-bigamt" }, fmtSol(remaining)),
+      el("span", { class: "mob-bigamt-suf" }, "SOL"),
+    ]),
+    el("div", { class: "mob-bar" }, el("div", { class: "mob-bar-fill", style: `width:${pct}%` })),
+    el("div", { class: "mob-bar-foot" }, [
+      el("span", {}, `of ${fmtSol(a.amount)} ◎ · `),
+      el("a", { style: "color:rgba(255,255,255,.7);text-decoration:underline",
+                href: ACC_LINK(a.escrow.toBase58()), target: "_blank" }, fmtPk(a.escrow)),
+      el("span", {}, expired ? "expired" : `${left}s left`),
+    ]),
+    expired
+      ? el("button", { class: "mob-cta compact mt-2", style: "background:#fff;color:#1a1f2e",
+                       on: { click: closeActive } }, "Close & reclaim")
+      : null,
+  ]);
+  c.appendChild(card);
+
+  // Primary CTA swaps based on state
+  if (expired) {
+    btnSign.style.display = "none";
+    btnNew.className = "mob-cta";
+  } else {
+    btnSign.style.display = "";
+    btnSign.className = "mob-cta";
+    btnNew.className = "mob-cta ghost";
+  }
+}
+// "My sessions" list moved out of home view into the History tab —
+// callers retain the function name as a no-op for backward compat.
+function renderSessions() { /* sessions list lives in History tab now */ }
+
+// ── render: bob ─────────────────────────────────────────────────────────
+function renderBobToday() {
+  $id("bob-today").textContent = fmtSol(state.bob.today);
+  $id("bob-today-count").textContent = `${state.bob.sales.length} sale${state.bob.sales.length === 1 ? "" : "s"}`;
+}
+function renderBobSales() {
+  const list = $id("bob-sales");
+  list.innerHTML = "";
+  if (!state.bob.sales.length) {
+    list.appendChild(el("div", { class: "mob-row" },
+      el("div", { class: "mob-row-main" }, el("div", { class: "mob-row-sub" }, "no sales yet"))));
+    return;
+  }
+  for (const s of state.bob.sales) {
+    list.appendChild(el("div", { class: "mob-row" }, [
+      el("div", { class: "mob-row-icon" }, "💵"),
+      el("div", { class: "mob-row-main" }, [
+        el("div", { class: "mob-row-title" }, `+${fmtSol(s.amount)} ◎`),
+        el("div", { class: "mob-row-sub" }, `nonce ${s.nonce} · ${fmtPk(s.escrow)}`),
+      ]),
+      el("div", { class: "mob-row-right" },
+        el("a", { href: TX_LINK(s.tx), target: "_blank" }, "tx ↗")),
+    ]));
+  }
+}
+
+// Render the "pending payments for you" card on Bob phone. Filters
+// localStorage-backed pending vouchers by `payee == connected wallet`.
+function renderBobPending() {
+  const list = $id("bob-pending");
+  if (!list) return;
+  list.innerHTML = "";
+  const me = bobKp.publicKey.toBase58();
+  const pending = loadPending().filter((p) => p.payee === me);
+
+  // Top banner — only when 2+ pending so "Claim all" is meaningful and we
+  // don't double up the CTA against the single per-row Claim button.
+  const banner = $id("bob-claim-banner");
+  if (banner) {
+    if (pending.length >= 2) {
+      const total = pending.reduce((s, p) => s.add(new BN(p.amount, "hex")), new BN(0));
+      banner.innerHTML = "";
+      banner.appendChild(el("div", { class: "mob-card-title" }, `${pending.length} vouchers ready to claim`));
+      banner.appendChild(el("div", { style: "margin-top:4px" }, [
+        el("span", { class: "mob-bigamt", style: "font-size:24px" }, fmtSol(total)),
+        el("span", { class: "mob-bigamt-suf" }, "SOL"),
+      ]));
+      banner.appendChild(el("button", { class: "mob-cta pos compact", style: "margin-top:10px",
+        on: { click: () => claimAllPending() } }, `Claim all ${pending.length}`));
+      banner.style.display = "block";
+    } else {
+      banner.style.display = "none";
+    }
+  }
+
+  if (!pending.length) {
+    list.appendChild(el("div", { class: "mob-row" },
+      el("div", { class: "mob-row-main" }, el("div", { class: "mob-row-sub" }, "no pending vouchers · payee match by connected wallet"))));
+    return;
+  }
+  for (const p of pending) {
+    const lams = new BN(p.amount, "hex");
+    const fromShort = `${p.escrow.slice(0, 4)}…${p.escrow.slice(-4)}`;
+    const blockTag = p.chain_meta ? ` · block #${p.chain_meta.block_index}` : "";
+    list.appendChild(el("div", { class: "mob-row" }, [
+      el("div", { class: "mob-row-icon" }, "✎"),
+      el("div", { class: "mob-row-main" }, [
+        el("div", { class: "mob-row-title" }, `${fmtSol(lams)} ◎ from ${fromShort}`),
+        el("div", { class: "mob-row-sub" }, `nonce ${p.nonce}${blockTag}`),
+      ]),
+      el("div", { class: "mob-row-right" },
+        el("button", { class: "btn btn-accent", style: "padding:4px 10px",
+          on: { click: async () => {
+            try { await settlePending(p); }
+            catch (e) { toast("bob", "err", (e.message ?? String(e)).slice(0, 100)); }
+          } } }, "Claim")),
+    ]));
+  }
+}
+
+// One-click "claim all" — settles vouchers sequentially.
+async function claimAllPending() {
+  const me = bobKp.publicKey.toBase58();
+  const pending = loadPending().filter((p) => p.payee === me);
+  for (const p of pending) {
+    try { await settlePending(p); }
+    catch (e) { pushActivity("bob", "err", (e.message ?? String(e)).slice(0, 100)); break; }
+  }
+}
+
+// Decode a stored pending voucher and submit settle. Pulls payment from
+// the contract; updates Bob's session cache (chain head/index) so the
+// next received voucher can be chain-verified.
+async function settlePending(p) {
+  const blob = Uint8Array.from(atob(p.b64), (c) => c.charCodeAt(0));
+  const msg = blob.slice(0, 84);
+  const sig = blob.slice(84);
+  const parsed = {
+    msg, sig,
+    escrow: new PublicKey(p.escrow),
+    nonce: new BN(p.nonce),
+    payee: new PublicKey(p.payee),
+    amount: new BN(p.amount, "hex"),
+  };
+  await bobSettle(parsed);
+  if (p.chain_meta) {
+    bobUpdateCached(p.escrow, p.chain_meta.block_hash, p.chain_meta.block_index);
+  }
+  removePending(p.b64);
+  renderBobPending();
+}
+
+// ── tx helpers ──────────────────────────────────────────────────────────
+async function sendViaPhantom(tx) {
+  tx.feePayer = wallet.publicKey;
+  tx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
+  const signed = await wallet.provider.signTransaction(tx);
+  const sig = await connection.sendRawTransaction(signed.serialize());
+  await connection.confirmTransaction(sig, "confirmed");
+  return sig;
+}
+
+// Sign + send a tx with Bob's in-browser keypair. No Phantom popup.
+async function sendViaBob(tx) {
+  tx.feePayer = bobKp.publicKey;
+  tx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
+  tx.sign(bobKp);
+  const sig = await connection.sendRawTransaction(tx.serialize());
+  await connection.confirmTransaction(sig, "confirmed");
+  return sig;
+}
+
+// Same for Alice's in-browser keypair.
+async function sendViaAlice(tx) {
+  tx.feePayer = aliceKp.publicKey;
+  tx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
+  tx.sign(aliceKp);
+  const sig = await connection.sendRawTransaction(tx.serialize());
+  await connection.confirmTransaction(sig, "confirmed");
+  return sig;
+}
+
+function programReadOnly() {
+  // Read-only Anchor program — uses connection only, no wallet.
+  // For account fetches and account.all() filters.
+  const dummy = { publicKey: PublicKey.default, signTransaction: async (t) => t, signAllTransactions: async (ts) => ts };
+  return new Program(idl, new AnchorProvider(connection, dummy, { commitment: "confirmed" }));
+}
+
+// ── alice: open new session ─────────────────────────────────────────────
+function sheetNewSession() {
+  let amount = 0.05, expires = 120;
+  const amountChips = [0.01, 0.05, 0.1, 0.5];
+  const expiresChips = [60, 120, 300, 1800];
+  const amountInput = el("input", { class: "mob-input", type: "number", step: "0.001", min: "0.001", value: amount });
+  const expiresInput = el("input", { class: "mob-input", type: "number", min: "10", value: expires });
+  const seedInput = el("input", { class: "mob-input", placeholder: "seed (random if empty)" });
+
+  const chipRow = (vals, on, kind) => {
+    const row = el("div", { class: "mob-chiprow" });
+    vals.forEach((v) => {
+      const initial = (kind === "amount" && v == amount) || (kind === "expires" && v == expires);
+      const c = el("button", { class: "mob-chip" + (initial ? " on" : "") }, String(v));
+      c.onclick = () => {
+        row.querySelectorAll(".mob-chip").forEach((x) => x.classList.remove("on"));
+        c.classList.add("on");
+        on(v);
+      };
+      row.appendChild(c);
+    });
+    return row;
+  };
+
+  const close = openSheet(
+    "alice", "New session",
+    "Lock SOL into an on-chain escrow PDA. Phantom will ask to sign the transaction.",
+    [
+      el("div", { class: "mob-label" }, "Amount (SOL)"),
+      chipRow(amountChips, (v) => { amount = v; amountInput.value = v; }, "amount"),
+      amountInput,
+      el("div", { class: "mob-label", style: "margin-top:14px" }, "Expires in (sec)"),
+      chipRow(expiresChips, (v) => { expires = v; expiresInput.value = v; }, "expires"),
+      expiresInput,
+      el("div", { class: "mob-label", style: "margin-top:14px" }, "Seed (optional)"),
+      seedInput,
+      el("button", { class: "mob-cta", style: "margin-top:18px", on: { click: async () => {
+        try {
+          const sol = parseFloat(amountInput.value);
+          const secs = parseInt(expiresInput.value);
+          const seedTxt = seedInput.value.trim();
+          const seed = seedTxt ? new BN(seedTxt) : new BN(Math.floor(Math.random() * 2 ** 31));
+          await createEscrow(seed, sol, secs);
+          close();
+        } catch (e) { toast("alice", "err", (e.message ?? String(e)).slice(0, 100)); }
+      } } }, "Lock funds"),
+    ],
+  );
+}
+
+async function createEscrow(seed, sol, secs) {
+  setStatus("alice", "working", `Locking ${sol} ◎`);
+  pushActivity("alice", "", `Submitting create_escrow(${sol} ◎, exp ${secs}s)…`);
+  const lams = lamports(sol);
+  const expiresAt = new BN(Math.floor(Date.now() / 1000) + secs);
+  const [escrow] = findEscrowPda(aliceKp.publicKey, seed);
+  const ix = await programReadOnly().methods.createEscrow(seed, lams, expiresAt).accounts({
+    authority: aliceKp.publicKey, escrow, systemProgram: SystemProgram.programId,
+  }).instruction();
+  const tx = new Transaction().add(ix);
+  const sig = await sendViaAlice(tx);
+  state.alice.active = { escrow, seed, amount: lams, spent: new BN(0), expires: expiresAt.toNumber(), nonceCursor: 1 };
+  state.alice.history.unshift({
+    escrow, seed: seed.toString(), amount: lams, spent: new BN(0),
+    remaining: lams, expires: expiresAt.toNumber(),
+  });
+  // Reset off-chain hash chain for the new session (genesis hash = zero).
+  saveChain(escrow.toBase58(), { head: ZERO_HASH, blocks: [] });
+  renderActiveCard(); renderSessions(); refreshAliceBalance(); renderChain();
+  pushActivity("alice", "tx", `Escrow opened · PDA ${fmtPk(escrow)}`, TX_LINK(sig));
+  setStatus("alice", "online", "Online");
+  toast("alice", "ok", "Session opened");
+}
+
+// ── alice: sign voucher ─────────────────────────────────────────────────
+function sheetSignVoucher() {
+  const a = state.alice.active;
+  if (!a) return;
+  const payeeInput = el("input", { class: "mob-input", placeholder: "paste Bob's pubkey (must differ from your wallet)", value: bobKp.publicKey.toBase58() });
+  const amountInput = el("input", { class: "mob-input", type: "number", step: "0.001", min: "0.001", value: "0.02" });
+  const out = el("div");
+
+  openSheet(
+    "alice", "Sign voucher (offline)",
+    "Builds the canonical 84-byte message and asks Phantom for a raw Ed25519 signature. No transaction, no RPC call. Default payee is the in-browser Test Bob; override to send to any pubkey.",
+    [
+      el("div", { class: "mob-label" }, "Payee"),
+      el("div", { class: "flex gap-2" }, [
+        payeeInput,
+        el("button", { class: "mob-chip", style: "max-width:90px;flex:0 0 auto",
+          on: { click: () => (payeeInput.value = bobKp.publicKey.toBase58()) } }, "Test Bob"),
+      ]),
+      el("div", { class: "mob-label", style: "margin-top:12px" }, "Amount (SOL)"),
+      amountInput,
+      out,
+      el("button", { class: "mob-cta", style: "margin-top:18px", on: { click: async () => {
+        try {
+          const payeeStr = payeeInput.value.trim();
+          if (!payeeStr) throw new Error("paste Bob's pubkey first");
+          const payee = new PublicKey(payeeStr);
+          if (payee.equals(aliceKp.publicKey)) throw new Error("payee can't equal Alice key (contract enforces this)");
+          const sol = parseFloat(amountInput.value);
+          const lams = lamports(sol);
+          await signVoucher(payee, lams, out);
+        } catch (e) { toast("alice", "err", (e.message ?? String(e)).slice(0, 100)); }
+      } } }, "Sign voucher (offline)"),
+    ],
+  );
+}
+
+async function signVoucher(payee, lams, qrHost) {
+  const a = state.alice.active;
+  if (!a) throw new Error("no active session");
+  const remaining = a.amount.sub(a.spent);
+  if (lams.gt(remaining)) throw new Error("amount > remaining");
+
+  state.alice.online = false;
+  setStatus("alice", "offline", "Offline");
+  pushActivity("alice", "", `Going offline → signing voucher #${a.nonceCursor}…`);
+  await sleep(280);
+
+  const nonce = new BN(a.nonceCursor);
+  const msg = buildVoucherMessage(a.escrow, nonce, payee, lams);
+
+  // Sign locally with Alice's in-browser key (nacl). Phantom's signMessage
+  // rejects 84-byte binary payloads as "looks like a transaction", so we
+  // bypass the wallet and sign directly. The signature still verifies on
+  // chain because escrow.authority == aliceKp.publicKey.
+  const signature = nacl.sign.detached(msg, aliceKp.secretKey);
+  const verified = nacl.sign.detached.verify(msg, signature, aliceKp.publicKey.toBytes());
+  if (!verified) throw new Error("local nacl verify failed");
+
+  const blob = new Uint8Array(msg.length + signature.length);
+  blob.set(msg, 0); blob.set(signature, msg.length);
+  const b64 = btoa(String.fromCharCode(...blob));
+  a.nonceCursor++;
+  pushActivity("alice", "ok", `Voucher #${nonce} signed · ${fmtSol(lams)} ◎ → ${fmtPk(payee)}`);
+
+  await sleep(250);
+  state.alice.online = true;
+  setStatus("alice", "online", "Online");
+
+  // Persist voucher so Bob phone (advanced/manual flow) can find it.
+  addPending({
+    b64,
+    escrow: a.escrow.toBase58(),
+    nonce: nonce.toNumber(),
+    payee: payee.toBase58(),
+    amount: lams.toString(16),
+    createdAt: Math.floor(Date.now() / 1000),
+  });
+  renderBobPending();
+
+  // Append to Alice's local hash chain (off-chain block log).
+  const block = await chainAppend(a.escrow.toBase58(), msg, b64, lams, payee);
+  pushActivity("alice", "ok", `Block #${block.index} · hash ${block.hash.slice(0, 8)}…`);
+  renderChain();
+
+  if (qrHost) {
+    qrHost.innerHTML = "";
+    const canvas = el("canvas", { width: 240, height: 240 });
+    await QRCode.toCanvas(canvas, b64, { width: 224, margin: 1 });
+    qrHost.appendChild(el("div", { class: "qr-view", style: "margin-top:18px" }, [
+      el("div", { class: "qr-frame" }, canvas),
+      el("div", { class: "qr-caption" }, `Voucher #${nonce} · ${fmtSol(lams)} ◎ → ${fmtPk(payee)}`),
+    ]));
+    const isTestBob = payee.equals(bobKp.publicKey);
+    qrHost.appendChild(el("div", { class: "mob-card", style: "margin-top:14px;background:#fff5f0;border-color:#fdcab2" }, [
+      el("div", { class: "mob-card-title", style: "color:#c44a1f" }, "Next step"),
+      el("div", { class: "mob-meta", style: "color:#7a3514;line-height:1.5" },
+        isTestBob
+          ? `Voucher saved. Switch to Bob phone and tap Settle on the pending row.`
+          : `Voucher payee is a custom address — switch your wallet to that account in your extension and use the "Paste voucher manually" flow on Bob phone.`),
+    ]));
+    const ta = el("textarea", { class: "mob-input tall", style: "margin-top:8px;font-size:10px" });
+    ta.value = b64;
+    qrHost.appendChild(ta);
+    qrHost.appendChild(el("button", { class: "mob-cta ghost compact", style: "margin-top:8px",
+      on: { click: () => { navigator.clipboard.writeText(b64); toast("alice", "ok", "Voucher copied"); } } },
+      "Copy voucher base64"));
+  }
+  return { b64, nonce, payee, lams, msg, sig: signature, block };
+}
+
+// ── alice: close ────────────────────────────────────────────────────────
+async function closeActive() {
+  const a = state.alice.active;
+  if (!a) return;
+  setStatus("alice", "working", "Closing");
+  pushActivity("alice", "", "Submitting close_escrow…");
+  try {
+    const ix = await programReadOnly().methods.closeEscrow().accounts({
+      authority: aliceKp.publicKey, escrow: a.escrow,
+    }).instruction();
+    const tx = new Transaction().add(ix);
+    const sig = await sendViaAlice(tx);
+    pushActivity("alice", "tx", `Escrow closed · rent + remainder back`, TX_LINK(sig));
+    state.alice.history = state.alice.history.filter((h) => h.escrow.toBase58() !== a.escrow.toBase58());
+    state.alice.active = null;
+    renderActiveCard(); renderSessions(); refreshAliceBalance();
+    setStatus("alice", "online", "Online");
+    toast("alice", "ok", "Session closed");
+  } catch (e) {
+    pushActivity("alice", "err", (e.message ?? String(e)).slice(0, 100));
+    setStatus("alice", "online", "Online");
+    toast("alice", "err", "Close failed");
+  }
+}
+
+// ── alice: reload history (chain) ───────────────────────────────────────
+async function loadHistory() {
+  try {
+    const accounts = await programReadOnly().account.escrow.all([
+      { memcmp: { offset: 8, bytes: aliceKp.publicKey.toBase58() } },
+    ]);
+    const list = $id("alice-history-list");
+    list.innerHTML = "";
+    if (!accounts.length) {
+      list.appendChild(el("div", { class: "mob-row" },
+        el("div", { class: "mob-row-main" }, el("div", { class: "mob-row-sub" }, "no escrows on chain"))));
+      pushActivity("alice", "", "No escrows on chain");
+      return;
+    }
+    const now = Math.floor(Date.now() / 1000);
+    for (const a of accounts) {
+      const expires = a.account.expiresAt.toNumber();
+      const expired = now >= expires;
+      list.appendChild(el("div", { class: "mob-row" }, [
+        el("div", { class: "mob-row-icon" }, "⛓"),
+        el("div", { class: "mob-row-main" }, [
+          el("div", { class: "mob-row-title" },
+            `${fmtSol(a.account.amount.sub(a.account.spent))} / ${fmtSol(a.account.amount)} ◎`),
+          el("div", { class: "mob-row-sub" }, `seed ${a.account.seed} · ${fmtPk(a.publicKey)}`),
+        ]),
+        el("div", { class: "mob-row-right" },
+          el("span", { class: `mob-stat ${expired ? "expired" : "ok"}` }, [
+            el("span", { class: "mob-stat-dot" }), expired ? "EXP" : `${expires - now}s`,
+          ])),
+      ]));
+    }
+    pushActivity("alice", "ok", `Loaded ${accounts.length} escrow(s) from chain`);
+  } catch (e) { toast("alice", "err", (e.message ?? String(e)).slice(0, 100)); }
+}
+async function loadHistoryQuiet() {
+  try {
+    const accounts = await programReadOnly().account.escrow.all([
+      { memcmp: { offset: 8, bytes: aliceKp.publicKey.toBase58() } },
+    ]);
+    const now = Math.floor(Date.now() / 1000);
+    state.alice.history = accounts.map((a) => ({
+      escrow: a.publicKey,
+      seed: a.account.seed.toString(),
+      amount: a.account.amount, spent: a.account.spent,
+      remaining: a.account.amount.sub(a.account.spent),
+      expires: a.account.expiresAt.toNumber(),
+    }));
+    const live = state.alice.history.find((h) => h.expires > now);
+    if (live) {
+      state.alice.active = {
+        escrow: live.escrow, seed: new BN(live.seed),
+        amount: live.amount, spent: live.spent,
+        expires: live.expires, nonceCursor: 1,
+      };
+    }
+    renderActiveCard(); renderSessions();
+  } catch {}
+}
+
+// ── bob: settle ─────────────────────────────────────────────────────────
+async function bobSettle(parsed) {
+  const { msg, sig, escrow, nonce, payee, amount } = parsed;
+  setStatus("bob", "working", "Settling");
+  pushActivity("bob", "", `Building settle tx (Ed25519 verify + settle ix)…`);
+  const bal = await connection.getBalance(bobKp.publicKey);
+  if (bal < 0.003 * LAMPORTS_PER_SOL) {
+    setStatus("bob", "online", "Ready");
+    throw new Error(`Test Bob has ${fmtSol(bal)} ◎ — needs ~0.003 ◎ for receipt rent + fee. Tap "Fund Bob" first.`);
+  }
+  const escrowAcc = await programReadOnly().account.escrow.fetch(escrow);
+  const ed25519Ix = Ed25519Program.createInstructionWithPublicKey({
+    publicKey: escrowAcc.authority.toBytes(),
+    message: msg,
+    signature: sig,
+  });
+  const [receipt] = findReceiptPda(escrow, nonce);
+  const settleIx = await programReadOnly().methods.settle(nonce, amount).accounts({
+    submitter: bobKp.publicKey,
+    escrow, payee, receipt,
+    ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
+    systemProgram: SystemProgram.programId,
+  }).instruction();
+  const tx = new Transaction().add(ed25519Ix).add(settleIx);
+  pushActivity("bob", "", "Signing locally with Test Bob keypair…");
+  const txSig = await sendViaBob(tx);
+  pushActivity("bob", "tx", `Settled +${fmtSol(amount)} ◎ · receipt ${fmtPk(receipt)}`, TX_LINK(txSig));
+  state.bob.sales.unshift({ tx: txSig, amount, nonce: nonce.toString(), escrow, receipt });
+  state.bob.today = state.bob.today.add(amount);
+
+  // Drop from local pending list (in case it came from there).
+  const blob = new Uint8Array(msg.length + sig.length);
+  blob.set(msg, 0); blob.set(sig, msg.length);
+  removePending(btoa(String.fromCharCode(...blob)));
+
+  renderBobToday(); renderBobSales(); renderBobPending();
+  if (state.alice.active && state.alice.active.escrow.toBase58() === escrow.toBase58()) {
+    state.alice.active.spent = state.alice.active.spent.add(amount);
+    pushActivity("alice", "tx", `Voucher #${nonce} settled · ${fmtSol(amount)} ◎ paid`, TX_LINK(txSig));
+    renderActiveCard();
+  }
+  setStatus("bob", "online", "Ready");
+  refreshAliceBalance();
+  refreshBobBalance();
+  toast("bob", "ok", `+${fmtSol(amount)} ◎ received`);
+  return txSig;
+}
+
+function sheetReceive() {
+  const ta = el("textarea", { class: "mob-input tall", placeholder: "paste voucher base64 from Alice" });
+  const decoded = el("div");
+  let parsed = null;
+
+  const renderDecoded = () => {
+    decoded.innerHTML = "";
+    if (!parsed) return;
+    decoded.appendChild(el("div", { class: "mob-card", style: "margin-top:14px" }, [
+      el("div", { class: "mob-card-title" }, "Voucher payload"),
+      el("div", { class: "kv", style: "margin-top:6px" }, [el("span", { class: "kv-key" }, "Amount"),
+        el("span", { class: "kv-val" }, `${fmtSol(parsed.amount)} ◎`)]),
+      el("div", { class: "kv", style: "margin-top:6px" }, [el("span", { class: "kv-key" }, "To"),
+        el("span", { class: "kv-val" }, fmtPk(parsed.payee))]),
+      el("div", { class: "kv", style: "margin-top:6px" }, [el("span", { class: "kv-key" }, "From"),
+        el("span", { class: "kv-val" }, fmtPk(parsed.escrow))]),
+      el("div", { class: "kv", style: "margin-top:6px" }, [el("span", { class: "kv-key" }, "Nonce"),
+        el("span", { class: "kv-val" }, parsed.nonce.toString())]),
+    ]));
+  };
+
+  const decode = () => {
+    try {
+      const b64 = ta.value.trim();
+      const blob = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      if (blob.length !== 84 + 64) throw new Error(`bad length ${blob.length}`);
+      const msg = blob.slice(0, 84);
+      const sig = blob.slice(84);
+      if (new TextDecoder().decode(msg.slice(0, 4)) !== "MORA") throw new Error("bad domain");
+      parsed = {
+        msg, sig,
+        escrow: new PublicKey(msg.slice(4, 36)),
+        nonce: new BN(msg.slice(36, 44), "le"),
+        payee: new PublicKey(msg.slice(44, 76)),
+        amount: new BN(msg.slice(76, 84), "le"),
+      };
+      pushActivity("bob", "ok", `Voucher decoded · ${fmtSol(parsed.amount)} ◎ from ${fmtPk(parsed.escrow)}`);
+      renderDecoded();
+    } catch (e) { parsed = null; renderDecoded(); toast("bob", "err", (e.message ?? String(e)).slice(0, 100)); }
+  };
+
+  const close = openSheet(
+    "bob", "Receive payment",
+    "Paste the voucher base64. Decode previews the payload. Settle posts the 2-ix transaction.",
+    [
+      ta,
+      el("button", { class: "mob-cta ghost compact", style: "margin-top:8px", on: { click: decode } }, "Decode"),
+      decoded,
+      el("button", { class: "mob-cta pos", style: "margin-top:14px", on: { click: async () => {
+        if (!parsed) { toast("bob", "err", "decode first"); return; }
+        try { await bobSettle(parsed); close(); }
+        catch (e) {
+          pushActivity("bob", "err", (e.message ?? String(e)).slice(0, 100));
+          toast("bob", "err", "Settle failed");
+          setStatus("bob", "online", "Ready");
+        }
+      } } }, "Settle to chain"),
+    ],
+  );
+}
+
+// ── render chain timeline (Alice phone) ─────────────────────────────────
+function renderChain() {
+  const host = $id("alice-chain");
+  if (!host) return;
+  host.innerHTML = "";
+  const a = state.alice.active;
+  if (!a) {
+    host.appendChild(el("div", { class: "mob-chain-empty" }, "chain empty · open a session"));
+    return;
+  }
+  const chain = loadChain(a.escrow.toBase58());
+  // genesis
+  host.appendChild(el("div", { class: "mob-chain-block genesis" }, [
+    el("div", { class: "idx" }, "G"),
+    el("div", { class: "hash" }, "00…00"),
+  ]));
+  if (!chain.blocks.length) {
+    host.appendChild(el("div", { class: "mob-chain-empty" }, "no vouchers signed yet"));
+    return;
+  }
+  chain.blocks.forEach((b, i) => {
+    host.appendChild(el("span", { class: "mob-chain-arrow" }, "→"));
+    host.appendChild(el("div", { class: "mob-chain-block" + (i === chain.blocks.length - 1 ? " head" : "") }, [
+      el("div", { class: "idx" }, `#${b.index}`),
+      el("div", { class: "val" }, `${fmtSol(new BN(b.amount, "hex"))} ◎`),
+      el("div", { class: "hash" }, `${b.hash.slice(0, 8)}…`),
+    ]));
+  });
+}
+
+// ── BroadcastChannel handlers ───────────────────────────────────────────
+// Bob → Alice: charge request. We open the approval sheet (or auto-approve
+// when scenario flag is set), sign on approval, broadcast voucher back.
+async function onAliceMsg(req) {
+  if (req.type !== "request") return;
+  const a = state.alice.active;
+  if (!a) {
+    btSendToBob({ type: "deny", request_id: req.request_id, reason: "no active session" });
+    return;
+  }
+  if (Date.now() / 1000 > req.expires_at) {
+    btSendToBob({ type: "deny", request_id: req.request_id, reason: "request expired" });
+    return;
+  }
+  pushActivity("alice", "", `BT request ← ${fmtPk(new PublicKey(req.bob_pk))} · ${fmtSol(new BN(req.amount_lamports))} ◎`);
+  const approve = req._auto ? Promise.resolve(true) : sheetApproval(req);
+  const ok = await approve;
+  if (!ok) {
+    btSendToBob({ type: "deny", request_id: req.request_id, reason: "rejected by Alice" });
+    pushActivity("alice", "", "Request rejected");
+    return;
+  }
+  try {
+    const v = await signVoucher(new PublicKey(req.bob_pk), new BN(req.amount_lamports), null);
+    btSendToBob({
+      type: "voucher",
+      request_id: req.request_id,
+      voucher_b64: v.b64,
+      escrow: a.escrow.toBase58(),
+      block_index: v.block.index,
+      prev_hash: v.block.prev,
+      block_hash: v.block.hash,
+    });
+    pushActivity("alice", "ok", `BT voucher → Bob · block #${v.block.index}`);
+  } catch (e) {
+    btSendToBob({ type: "deny", request_id: req.request_id, reason: (e.message ?? String(e)).slice(0, 80) });
+    pushActivity("alice", "err", (e.message ?? String(e)).slice(0, 100));
+  }
+}
+
+// Alice → Bob: voucher (or denial) for a previously sent charge request.
+async function onBobMsg(msg) {
+  const r = bobAwaiting.get(msg.request_id);
+  if (!r) return; // unknown request, ignore
+  bobAwaiting.delete(msg.request_id);
+  if (msg.type === "deny") {
+    pushActivity("bob", "err", `BT denied: ${msg.reason}`);
+    setStatus("bob", "online", "Ready");
+    r.reject(new Error(msg.reason));
+    return;
+  }
+  if (msg.type !== "voucher") return;
+  // Validate hash chain link
+  const cached = bobGetCached(msg.escrow);
+  if (cached && cached.last_block_hash !== msg.prev_hash) {
+    pushActivity("bob", "err", `Chain mismatch: expected prev ${cached.last_block_hash.slice(0, 8)}…, got ${msg.prev_hash.slice(0, 8)}…`);
+    r.reject(new Error("chain mismatch"));
+    return;
+  }
+  pushActivity("bob", "ok", `BT voucher ← Alice · block #${msg.block_index}`);
+  // Decode + queue for explicit Bob-initiated settle. Bob actively claims
+  // by tapping the "Claim" button on the pending row, which submits the
+  // settle ix and pulls funds from the escrow PDA.
+  try {
+    const blob = Uint8Array.from(atob(msg.voucher_b64), (c) => c.charCodeAt(0));
+    const m = blob.slice(0, 84);
+    const amount = new BN(m.slice(76, 84), "le");
+    const payee = new PublicKey(m.slice(44, 76));
+    const nonce = new BN(m.slice(36, 44), "le");
+    addPending({
+      b64: msg.voucher_b64,
+      escrow: msg.escrow,
+      nonce: nonce.toNumber(),
+      payee: payee.toBase58(),
+      amount: amount.toString(16),
+      createdAt: Math.floor(Date.now() / 1000),
+      chain_meta: {
+        block_index: msg.block_index,
+        prev_hash: msg.prev_hash,
+        block_hash: msg.block_hash,
+      },
+    });
+    renderBobPending();
+    setStatus("bob", "online", "Ready");
+    toast("bob", "ok", `+${fmtSol(amount)} ◎ ready to claim`);
+    pushActivity("bob", "", `Tap "Claim" on the pending row to settle on chain`);
+    r.resolve({
+      voucher_b64: msg.voucher_b64,
+      escrow: msg.escrow,
+      nonce: nonce.toNumber(),
+      payee: payee.toBase58(),
+      amount: amount.toString(16),
+      block_hash: msg.block_hash,
+      block_index: msg.block_index,
+    });
+  } catch (e) {
+    pushActivity("bob", "err", (e.message ?? String(e)).slice(0, 100));
+    r.reject(e);
+  }
+}
+
+// Bob composes a payment request and waits for the BT round-trip.
+function bobSendCharge(amountLamports, description, opts = {}) {
+  const request_id = crypto.randomUUID();
+  const req = {
+    type: "request",
+    request_id,
+    bob_pk: bobKp.publicKey.toBase58(),
+    amount_lamports: typeof amountLamports === "string" ? amountLamports : amountLamports.toString(),
+    description: description || "",
+    expires_at: Math.floor(Date.now() / 1000) + 60,
+    _auto: !!opts.autoApprove,
+  };
+  pushActivity("bob", "", `BT charge → Alice · ${fmtSol(new BN(req.amount_lamports))} ◎${description ? ` (${description})` : ""}`);
+  setStatus("bob", "working", "Awaiting approval");
+  return new Promise((resolve, reject) => {
+    bobAwaiting.set(request_id, { resolve, reject });
+    btSendToAlice(req);
+    setTimeout(() => {
+      if (bobAwaiting.has(request_id)) {
+        bobAwaiting.delete(request_id);
+        setStatus("bob", "online", "Ready");
+        reject(new Error("BT request timed out"));
+      }
+    }, 90_000);
+  });
+}
+
+// Bob's "Charge customer" sheet — POS-style amount entry.
+function sheetCharge() {
+  const amountInput = el("input", { class: "mob-input", type: "number", step: "0.001", min: "0.001", value: "0.02" });
+  const descInput = el("input", { class: "mob-input", placeholder: "e.g. Coffee, Lunch" });
+  const close = openSheet("bob", "Charge customer",
+    "Sends an over-BT request to Alice. Alice approves on her phone, signs the voucher, and the response auto-settles here.",
+    [
+      el("div", { class: "mob-label" }, "Amount (SOL)"),
+      amountInput,
+      el("div", { class: "mob-label", style: "margin-top:12px" }, "Description"),
+      descInput,
+      el("button", { class: "mob-cta pos", style: "margin-top:18px", on: { click: async () => {
+        try {
+          const sol = parseFloat(amountInput.value);
+          const lams = lamports(sol);
+          const desc = descInput.value.trim();
+          close();
+          await bobSendCharge(lams, desc);
+        } catch (e) {
+          toast("bob", "err", (e.message ?? String(e)).slice(0, 100));
+        }
+      } } }, "Send to Alice"),
+    ],
+  );
+}
+
+// Alice's approval sheet — shown when a BT request comes in.
+function sheetApproval(req) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (ok) => { if (resolved) return; resolved = true; close(); resolve(ok); };
+    const close = openSheet("alice", "Payment request",
+      `${fmtPk(new PublicKey(req.bob_pk))} is asking ${fmtSol(new BN(req.amount_lamports))} ◎${req.description ? ` for "${req.description}"` : ""}.`,
+      [
+        el("div", { class: "mob-card" }, [
+          el("div", { class: "kv" }, [el("span", { class: "kv-key" }, "From"), el("span", { class: "kv-val" }, fmtPk(new PublicKey(req.bob_pk)))]),
+          el("div", { class: "kv", style: "margin-top:6px" }, [el("span", { class: "kv-key" }, "Amount"), el("span", { class: "kv-val" }, `${fmtSol(new BN(req.amount_lamports))} ◎`)]),
+          req.description ? el("div", { class: "kv", style: "margin-top:6px" }, [el("span", { class: "kv-key" }, "For"), el("span", { class: "kv-val" }, req.description)]) : null,
+          el("div", { class: "kv", style: "margin-top:6px" }, [el("span", { class: "kv-key" }, "Expires"), el("span", { class: "kv-val" }, `in ${Math.max(0, req.expires_at - Math.floor(Date.now() / 1000))}s`)]),
+        ]),
+        el("button", { class: "mob-cta", style: "margin-top:18px", on: { click: () => finish(true) } }, "Approve & sign"),
+        el("button", { class: "mob-cta ghost compact", style: "margin-top:8px", on: { click: () => finish(false) } }, "Reject"),
+      ],
+    );
+  });
+}
+
+// ── auto scenario ───────────────────────────────────────────────────────
+function setStep(n) {
+  document.querySelectorAll(".scenario-step").forEach((s) => {
+    const k = parseInt(s.dataset.step);
+    s.classList.toggle("active", k === n);
+    s.classList.toggle("done", k < n);
+  });
+}
+function clearSteps() {
+  document.querySelectorAll(".scenario-step").forEach((s) => s.classList.remove("active", "done"));
+}
+
+// Scenario: full demo end-to-end with one Phantom popup for create_escrow,
+// one for signMessage, and (if Bob runs out) one for the funding transfer.
+// Bob's settle is signed locally so no popup. Last step (close) is left
+// manual since we wait for expiry.
+async function runScenario() {
+  const btn = $id("run-scenario");
+  btn.disabled = true; clearSteps();
+  $id("scenario-status").innerHTML = "<b>running…</b>";
+  try {
+    const aliceBal = await connection.getBalance(aliceKp.publicKey);
+    if (aliceBal < 0.06 * LAMPORTS_PER_SOL) {
+      pushActivity("alice", "err", `Alice has ${fmtSol(aliceBal)} ◎ — needs ≥ 0.06 ◎ for the demo.`);
+      $id("scenario-status").innerHTML = `<b>error:</b> Alice needs ≥0.06 ◎. Send SOL to <code style="color:#fff">${aliceKp.publicKey.toBase58().slice(0, 8)}…</code> via <a href="https://faucet.solana.com/" target="_blank" style="color:#fff;text-decoration:underline">faucet.solana.com</a> ${wallet.publicKey ? "or tap Phantom-fund Alice in the wallet card" : "(or connect Phantom + fund)"}.`;
+      btn.disabled = false; return;
+    }
+    const bobBal = await connection.getBalance(bobKp.publicKey);
+    if (bobBal < 0.003 * LAMPORTS_PER_SOL) {
+      $id("scenario-status").innerHTML = "<b>step 0 ·</b> funding Test Bob with 0.005 ◎ from Alice…";
+      pushActivity("bob", "", "Bob has < 0.003 ◎ — funding from Alice first");
+      await fundBob();
+    }
+
+    setStep(1);
+    const seed = new BN(Math.floor(Math.random() * 2 ** 31));
+    await createEscrow(seed, 0.05, 120);
+    await sleep(600);
+
+    setStep(2);
+    state.alice.online = false;
+    setStatus("alice", "offline", "Offline");
+    pushActivity("alice", "", "Phone went offline — RPC unreachable");
+    await sleep(700);
+
+    setStep(3);
+    // Bob → BT charge → Alice auto-approves → voucher returns to Bob's
+    // pending queue (NOT auto-settled).
+    const v = await bobSendCharge(lamports(0.02), "Coffee", { autoApprove: true });
+    state.alice.online = true;
+    setStatus("alice", "online", "Online");
+    pushActivity("bob", "", "Voucher in pending queue · firing claim in 1s…");
+    await sleep(1000);
+
+    setStep(4);
+    // Bob actively claims — settle ix runs, payment pulled from contract.
+    await settlePending({
+      b64: v.voucher_b64,
+      escrow: v.escrow,
+      nonce: v.nonce,
+      payee: v.payee,
+      amount: v.amount,
+      chain_meta: { block_index: v.block_index, prev_hash: null, block_hash: v.block_hash },
+    });
+    await sleep(400);
+
+    setStep(5);
+    pushActivity("alice", "", "Waiting for expiry to demo close…");
+    $id("scenario-status").innerHTML = "<b>step 5 ·</b> wait for the session to expire, then tap <b>Close & reclaim</b> on Alice phone.";
+    btn.disabled = false;
+    btn.textContent = "▶ Re-run scenario";
+  } catch (e) {
+    const m = (e.message ?? String(e)).slice(0, 140);
+    pushActivity("alice", "err", `Scenario error: ${m}`);
+    $id("scenario-status").innerHTML = `<b>error:</b> ${m}`;
+    btn.disabled = false;
+  }
+}
+
+// ── bind buttons ────────────────────────────────────────────────────────
+$id("run-scenario").onclick = runScenario;
+$id("connect-btn").onclick = connectWallet;
+
+$id("alice-btn-new").onclick = sheetNewSession;
+$id("alice-btn-sign").onclick = sheetSignVoucher;
+$id("alice-btn-refresh").onclick = refreshAliceBalance;
+$id("alice-btn-list-refresh").onclick = loadHistory;
+$id("alice-btn-copy").onclick = () => {
+  navigator.clipboard.writeText(aliceKp.publicKey.toBase58());
+  toast("alice", "ok", "Alice address copied");
+};
+$id("alice-btn-fund").onclick = () => fundAliceFromPhantom(0.1);
+$id("bob-btn-charge").onclick = sheetCharge;
+$id("bob-btn-receive").onclick = sheetReceive;
+$id("bob-btn-fund").onclick = fundBob;
+$id("bob-btn-fund-inline").onclick = fundBob;
+$id("bob-btn-refresh").onclick = refreshBobBalance;
+$id("bob-btn-copy").onclick = () => {
+  navigator.clipboard.writeText(bobKp.publicKey.toBase58());
+  toast("bob", "ok", "Test Bob address copied");
+};
+$id("bob-btn-export").onclick = () => {
+  const arr = Array.from(bobKp.secretKey);
+  const blob = new Blob([JSON.stringify(arr)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "mora-test-bob-keypair.json";
+  a.click();
+};
+$id("bob-btn-regen").onclick = async () => {
+  if (!confirm("Regenerate Test Bob? Existing balance becomes unreachable (devnet only — replay if needed).")) return;
+  bobKp = regenBobKp();
+  state.bob.sales = []; state.bob.today = new BN(0);
+  renderBobToday(); renderBobSales(); renderBobPending();
+  await renderBobIdentity();
+  pushActivity("bob", "", `New Test Bob · ${fmtPk(bobKp.publicKey)}`);
+};
+
+// ── periodic countdown redraw ───────────────────────────────────────────
+setInterval(() => { if (state.alice.active) renderActiveCard(); }, 1000);
+
+// ── init ────────────────────────────────────────────────────────────────
+renderChain();
+await renderConnection();
+
+// auto-reconnect if Phantom remembers us
+const phantom = detectPhantom();
+if (phantom?.isConnected) {
+  try { await phantom.connect({ onlyIfTrusted: true }); wallet.provider = phantom; wallet.publicKey = phantom.publicKey; await afterConnect(); } catch {}
+}
+</script>
+</body>
+</html>
