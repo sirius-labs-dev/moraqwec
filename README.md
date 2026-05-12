@@ -1,81 +1,144 @@
-# Mora
+# MORA × QVAC — Offline Payments + Offline AI on Solana
 
-Offline payment escrow on Solana — devnet prototype.
+> MORA handles payments without internet. QVAC handles AI without cloud.
+> Together: a merchant in Lagos receives a payment and gets a human-readable
+> explanation in their local language — entirely offline.
 
-- **On-chain program (devnet):** [`9fcXHD3pHDKLX79JuVgCEKQiqYkvVqFtpoAEVjBq4aJ8`](https://explorer.solana.com/address/9fcXHD3pHDKLX79JuVgCEKQiqYkvVqFtpoAEVjBq4aJ8?cluster=devnet)
-- **3 instructions:** `create_escrow`, `settle`, `close_escrow`
-- **Voucher:** 84-byte Ed25519-signed message — `"MORA" | escrow | nonce | payee | amount`
+**Colosseum Frontier 2026 · Tether QVAC Track Submission**
 
-## Repo layout
+---
+
+## The Problem
+
+MORA lets users send SOL offline via cryptographic voucher chains. But the
+payment confirmation is a raw 84-byte blob — not human-readable. For a merchant
+in Lagos, Nairobi, or Jakarta with no internet and no technical background,
+this is a barrier.
+
+QVAC solves the last mile: a local AI model explains the payment in plain
+language, in any language, without any cloud dependency.
+
+---
+
+## How QVAC Is Used
+
+QVAC's `LLAMA_3_2_1B_INST_Q4_0` model runs locally via `@qvac/sdk`.
+No API key. No cloud. No internet required after the first model download.
+
+When a MORA voucher is received, the script:
+1. Parses the voucher (amount, nonce, payee, escrow)
+2. Loads the QVAC model on-device
+3. Generates a plain-language explanation in the requested language
+4. Outputs it locally — no data leaves the device
+
+```typescript
+import { loadModel, LLAMA_3_2_1B_INST_Q4_0, completion, unloadModel } from "@qvac/sdk";
+
+const modelId = await loadModel({
+  modelSrc: LLAMA_3_2_1B_INST_Q4_0,
+  modelType: "llm",
+});
+
+const result = completion({ modelId, history, stream: true });
+for await (const token of result.tokenStream) {
+  process.stdout.write(token);
+}
+```
+
+---
+
+## Demo Output
 
 ```
-programs/mora/        Anchor program (Rust)
-cli/mora.ts           TypeScript CLI for create/voucher/settle/close
-tests/mora.ts         Anchor TS tests (localnet + devnet smoke)
-web/                  Vanilla HTML/CSS/JS demo (deployable as a static site)
+╔═══════════════════════════════════════════╗
+║  MORA × QVAC — Offline Payment Explainer  ║
+╚═══════════════════════════════════════════╝
+
+Payment details:
+  Amount:  0.0100 SOL (10000000 lamports)
+  Nonce:   1
+  Payee:   bbbbbbbbbbbbbbbb...
+
+[QVAC] Loading local AI model (no cloud required)...
+[QVAC] Model ready.
+[QVAC] Generating explanation in English...
+
+──────────────────────────────────────────────────
+The amount 0.0100 SOL was paid using MORA offline
+payments on Solana. This payment is cryptographically
+verified and cannot be replayed.
+──────────────────────────────────────────────────
+
+✓ Payment explained locally. No cloud required.
+✓ MORA voucher verified offline.
+✓ QVAC AI ran entirely on this device.
 ```
 
-## Web demo
+---
 
-Two-phone visualization (Alice signer + Bob POS) with simulated Bluetooth
-transport (`BroadcastChannel`), off-chain hash chain, and on-chain settle.
-Uses Phantom (optional) for funding the in-browser test keys.
-
-### Run locally
+## Setup
 
 ```bash
+git clone https://github.com/sirius-labs-dev/moraqwec
+cd moraqwec
 npm install
-npm run web
-# open http://localhost:5173/
+
+# Run demo (downloads ~773MB model on first run)
+npx tsx cli/mora-qvac.ts demo
+
+# Explain in a specific language
+npx tsx cli/mora-qvac.ts demo --lang Yoruba
+npx tsx cli/mora-qvac.ts demo --lang Turkish
+npx tsx cli/mora-qvac.ts demo --lang Arabic
+
+# Explain a real voucher
+npx tsx cli/mora-qvac.ts explain --voucher <base64> --lang English
 ```
 
-### Deploy to Vercel
+---
 
-The repo root has a `vercel.json` that publishes the `web/` directory as a
-static site (no build step):
+## Why QVAC Is Central
 
-```bash
-npm install -g vercel
-vercel --prod
+| Without QVAC | With QVAC |
+|-------------|-----------|
+| Raw bytes: `MORA\xaa\xbb...` | "A payment of 0.01 SOL was received and verified." |
+| English only (technical) | Any language, offline |
+| Requires developer | Works for any merchant |
+
+QVAC is not a wrapper here. It is the only component that makes the payment
+human-readable to a non-technical merchant in a low-connectivity environment.
+Remove QVAC and the merchant sees a base64 string. This is load-bearing.
+
+---
+
+## Architecture
+
+```
+MORA voucher (offline, no internet)
+       │
+       ▼
+cli/mora-qvac.ts
+       │
+       ├── Parse voucher (amount, nonce, payee)
+       │
+       └── QVAC LLM (local, no cloud)
+               │
+               ▼
+       Plain-language explanation
+       in any language, on-device
 ```
 
-Or push to GitHub and import in the Vercel dashboard — the included
-`vercel.json` + `.vercelignore` configure the project automatically. Set
-the **Root Directory** to the repo root (default), Vercel will pick up
-`outputDirectory: "web"`.
+---
 
-The site only needs:
-- `web/index.html`
-- `web/styles.css`
-- `web/mora.json` (Anchor IDL, fetched at runtime)
+## MORA Program
 
-External deps (`@solana/web3.js`, `@coral-xyz/anchor`, `tweetnacl`, `qrcode`)
-are loaded from `esm.sh` CDN, so there is no bundler / build step.
+Deployed on Solana devnet:
+`9fcXHD3pHDKLX79JuVgCEKQiqYkvVqFtpoAEVjBq4aJ8`
 
-## CLI
+Live demo: [mora-sand.vercel.app](https://mora-sand.vercel.app)
 
-```bash
-npx tsx cli/mora.ts --help
-```
+---
 
-Commands: `create`, `voucher` (offline sign), `settle`, `close`, `status`,
-`list`. Reads keypair from `~/.config/solana/id.json` by default.
+## License
 
-## Tests
-
-```bash
-# localnet (start a validator first)
-solana-test-validator --reset --quiet --ledger /tmp/test-ledger &
-solana airdrop 100 $(solana-keygen pubkey ~/.config/solana/id.json) --url http://127.0.0.1:8899
-anchor test --skip-local-validator   # uses [provider] cluster from Anchor.toml
-
-# devnet smoke (program already deployed)
-anchor test --skip-local-validator --skip-deploy --skip-build --provider.cluster devnet
-```
-
-4 / 4 happy-path tests passing on both localnet and devnet:
-
-- `create_escrow` locks SOL into a PDA
-- `settle` pays via Ed25519-verified voucher
-- replay of the same nonce is rejected (Receipt PDA `init`)
-- `close_escrow` refunds remainder after expiry
+Apache 2.0
